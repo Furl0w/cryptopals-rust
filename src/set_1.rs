@@ -1,11 +1,12 @@
 use base64;
 use hex;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 fn hex_to_64(hex: &String) -> String {
-    let raw = hex::decode(hex);
-    let txt = raw.unwrap();
-    println!("{}", String::from_utf8_lossy(&*txt));
-    base64::encode(&txt)
+    let v = hex::decode(hex).unwrap();
+    println!("{}", String::from_utf8_lossy(&*v));
+    base64::encode(&v)
 }
 
 #[test]
@@ -28,9 +29,9 @@ fn xor_hex(hex1: &String, hex2: &String) -> String {
 
 #[test]
 fn test_chall2() {
-    let hex = String::from("1c0111001f010100061a024b53535009181c");
-    let bytes = String::from("686974207468652062756c6c277320657965");
-    let result = xor_hex(&hex, &bytes);
+    let hex_1 = String::from("1c0111001f010100061a024b53535009181c");
+    let hex_2 = String::from("686974207468652062756c6c277320657965");
+    let result = xor_hex(&hex_1, &hex_2);
     assert_eq!(result, "746865206b696420646f6e277420706c6179")
 }
 
@@ -79,19 +80,48 @@ fn break_single_byte_xor(hex: &String) -> Vec<u8> {
     for byte in 0..=255 {
         let xored_s = single_byte_xor(&s, byte);
         let output_score = score_plain_english(&xored_s);
-		if output_score < score {
-			score = output_score;
-			message = xored_s;
-       }
+        if output_score < score {
+            score = output_score;
+            message = xored_s;
+        }
     }
     message
 }
-
 
 #[test]
 fn test_chall3() {
     let hex = String::from("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736");
     let message = break_single_byte_xor(&hex);
-    println!("{}",String::from_utf8_lossy(&message));
+    println!("{}", String::from_utf8_lossy(&message));
 }
 
+fn seek_single_byte_xored_in_file(path: &String) -> Vec<u8> {
+    let mut score: f64 = std::f64::MAX;
+    let mut message: Vec<u8> = vec![0u8];
+    let file = File::open(path).unwrap();
+    for line in BufReader::new(file).lines() {
+        let line_message = break_single_byte_xor(&line.unwrap());
+        if line_message != vec![0u8] {
+            let output_score = score_plain_english(&line_message);
+            println!("{}", String::from_utf8_lossy(&line_message));
+            println!("{}", &output_score);
+            if output_score < score {
+                score = output_score;
+                message = line_message;
+            }
+        }
+    }
+    message
+}
+
+/* Little comment on this one
+    The final message is not the good one, this is most likely due to my choice of scoring the plaintext and the fact that message is very short
+    I Have printed all the message and their respective score in the function tho so you can see for yourselft
+    The message is : "Now that the party is jumping"
+*/
+#[test]
+fn test_chall4() {
+    let path = String::from("./data/4.txt");
+    let message = seek_single_byte_xored_in_file(&path);
+    println!("most likely to be plain english message {}", String::from_utf8_lossy(&message));
+}
